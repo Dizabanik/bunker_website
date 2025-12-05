@@ -1,7 +1,8 @@
+
 #!/bin/bash
 
 ###########################################
-# React + GitHub Pages Auto Setup Script
+# Vite + Tailwind + GitHub Pages Auto Setup
 # macOS
 ###########################################
 
@@ -24,14 +25,6 @@ if ! command -v node >/dev/null 2>&1; then
     brew install node
 else
     echo "✅ Node already installed."
-fi
-
-echo "🔍 Checking yarn..."
-if ! command -v yarn >/dev/null 2>&1; then
-    echo "🟡 Installing Yarn..."
-    npm install -g yarn
-else
-    echo "✅ Yarn already installed."
 fi
 
 ###########################################
@@ -67,30 +60,46 @@ else
 fi
 
 ###########################################
-# 4. Create React App (only if none exists)
+# 4. Install Vite/Tailwind dependencies
 ###########################################
 
-if [ ! -f "package.json" ]; then
-    echo "📦 No package.json found. Creating React app..."
-    npx create-react-app .
+if [ -f "package.json" ]; then
+    echo "📦 Installing dependencies (npm install)..."
+    npm install
 else
-    echo "✅ React project already exists."
+    echo "❌ No package.json found. This is NOT a Vite project."
+    echo "Exiting."
+    exit 1
 fi
 
 ###########################################
-# 5. Setup GitHub Actions workflow for Pages
+# 5. Build Vite website
+###########################################
+
+echo "🏗 Building Vite project..."
+npm run build
+
+if [ ! -d "dist" ]; then
+    echo "❌ Build FAILED: no dist/ folder found."
+    exit 1
+fi
+
+echo "✅ Build successful."
+
+###########################################
+# 6. Setup GitHub Actions workflow (Vite)
 ###########################################
 
 WORKFLOW_DIR=".github/workflows"
 WORKFLOW_FILE="$WORKFLOW_DIR/deploy.yml"
 
 if [ ! -f "$WORKFLOW_FILE" ]; then
-    echo "📝 Creating GitHub Actions workflow for React + Pages..."
+    echo "📝 Creating GitHub Actions workflow for Vite + GitHub Pages..."
 
     mkdir -p "$WORKFLOW_DIR"
 
     cat > "$WORKFLOW_FILE" <<EOF
-name: Deploy React to GitHub Pages
+name: Deploy Vite to GitHub Pages
 
 on:
   push:
@@ -115,13 +124,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build
+      - name: Build Vite site
         run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./build
+          path: ./dist
 
   deploy:
     needs: build
@@ -137,11 +146,11 @@ else
 fi
 
 ###########################################
-# 6. Commit + push
+# 7. Commit + push everything (except node_modules)
 ###########################################
 
 echo "📤 Adding files..."
-git add .
+git add . -- ':!node_modules'
 
 echo "📝 Commit message (default: 'update'):"
 read -r MSG
@@ -153,7 +162,7 @@ echo "⬆️ Pushing to GitHub..."
 git push -u origin main
 
 ###########################################
-# 7. Print GitHub Pages URL
+# 8. Print GitHub Pages URL
 ###########################################
 
 USER_REPO=$(echo "$REPO_URL" | sed 's/git@github.com://; s/\.git//')
@@ -161,8 +170,7 @@ USERNAME=$(echo "$USER_REPO" | cut -d'/' -f1)
 REPONAME=$(echo "$USER_REPO" | cut -d'/' -f2)
 
 echo ""
-echo "🌐 If GitHub Pages is enabled in repository settings, your site will appear at:"
+echo "🌐 Your Vite website will be deployed to:"
 echo "➡️ https://$USERNAME.github.io/$REPONAME"
 echo ""
-
 echo "🎉 All done!"
